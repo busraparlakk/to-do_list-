@@ -30,7 +30,7 @@ Tarayıcı ──► :8080 (Go Reverse Proxy)
                  │
       path == /api/*  ──►  :4000 (API servisi)  ──►  todos.json
       path == diğer   ──►  :3000 (Web UI servisi)
-Üç bağımsız process, üç bağımsız klasör, üç bağımsız çalıştırma komutu. Bunları önce ayrı ayrı sağlamlaştırıp en son birleştireceksin — bu proje boyunca tekrar edeceğin temel prensip bu.
+Üç bağımsız process, üç bağımsız klasör, üç bağımsız çalıştırma komutu. Bunları önce ayrı ayrı sağlamlaştırıp en son birleştireceksin — bu proje boyunca tekrar edeceğin temel prensip bu. //bu 3 farklı dediği uı -apı- reverse proxy
 
 FAZ 0 — İskelet ve Sözleşmeler (kod yazmadan önce)
 Neden bu faz en başta?
@@ -63,7 +63,7 @@ Neden bu dosya önce yazılır, koddan önce? Çünkü Faz 1'de API'yi yazarken 
 
 Doğrulama: Dokümanı bir arkadaşına (ya da kendine, bir gün sonra) verdiğinde, kod görmeden sadece bu dosyaya bakarak API'yi nasıl kullanacağını anlatabilmen gerekir.
 
-Adım 0.3 — Port ve isimlendirme kararlarını docs/README.md'ye yaz
+burdayım Adım 0.3 — Port ve isimlendirme kararlarını docs/README.md'ye yaz
 API servisi → port 4000
 Web UI servisi → port 3000
 Gateway (dışarıya açılan tek kapı) → port 8080
@@ -72,14 +72,13 @@ Neden bunu ayrı bir yere yazıyoruz? İleride (Faz 3'te) proxy'yi yazarken bu n
 FAZ 1 — API Servisi (Backend)
 Neden UI'den önce API?
 Web UI, API olmadan test edilemez (veri gelecek bir yer yok) ama API, UI olmadan curl ile tamamen test edilebilir. Yani önce bağımsız test edilebilir olanı kurmak, seni daha az belirsizlikle ilerletir. Bu sıralama tesadüfi değil: "önce en az bağımlılığı olan katmanı sağlamlaştır" prensibi.
-
 Adım 1.1 — Boş bir HTTP sunucusu ayağa kaldır (tek endpoint: /health)
 Ne yapacaksın: api-service/ içinde, seçtiğin dilin en minimal HTTP sunucusunu kur. Sadece GET /health isteğine 200 OK ve {"status":"ok"} dönsün.
 
 Neden CRUD'a değil de sağlık kontrolüne önce başlıyoruz? Çünkü şu an test etmek istediğin şey iş mantığı değil, "sunucu gerçekten ayakta mı, doğru portu dinliyor mu" sorusu. En küçük, en az mantık içeren parçadan başlayıp onu doğrulamak, ileride bir hata çıktığında "sorun temel kurulumda mı yoksa iş mantığında mı" ayrımını kolaylaştırır.
 
 Doğrulama: curl http://localhost:4000/health çalıştır, 200 ve beklediğin JSON'u görmelisin.
-
+##
 Adım 1.2 — todos.json dosyasını ve okuma/yazma yardımcı fonksiyonlarını oluştur
 Ne yapacaksın:
 
