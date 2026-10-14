@@ -22,10 +22,12 @@ func main() {
 	mux.HandleFunc("POST /api/todos", createTodoHandler)
 	mux.HandleFunc("GET /api/todos", listTodosHandler)
 	mux.HandleFunc("GET /api/todos/{id}", getTodoHandler)
+	mux.HandleFunc("PUT /api/todos/{id}", updateTodoHandler)
+	mux.HandleFunc("DELETE /api/todos/{id}", deleteTodoHandler)
 
 	log.Println("API servisi http://localhost:4000 adresinde çalışıyor")
 
-	err := http.ListenAndServe(":4000", mux)
+	err := http.ListenAndServe(":4000", corsMiddleware(mux))
 	if err != nil {
 		log.Fatal(err)
 	}

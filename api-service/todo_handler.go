@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -119,6 +120,122 @@ func getTodoHandler(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(todo)
 			return
 		}
+	}
+
+	http.Error(w, "Todo bulunamadı", http.StatusNotFound)
+}
+func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	var request UpdateTodoRequest
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(&request); err != nil {
+		http.Error(w, "Geçersiz JSON veya alan", http.StatusBadRequest)
+		return
+	}
+
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		http.Error(w, "Body tek bir JSON nesnesi içermeli", http.StatusBadRequest)
+		return
+	}
+
+	if request.Title == nil && request.Description == nil &&
+		request.Done == nil && request.DueDate == nil {
+		http.Error(w, "En az bir güncellenecek alan gönderilmeli", http.StatusBadRequest)
+		return
+	}
+
+	if request.Title != nil {
+		title := strings.TrimSpace(*request.Title)
+		if title == "" {
+			http.Error(w, "title boş olamaz", http.StatusBadRequest)
+			return
+		}
+		request.Title = &title
+	}
+
+	if request.DueDate != nil && *request.DueDate != "" {
+		if _, err := time.Parse(time.RFC3339, *request.DueDate); err != nil {
+			http.Error(w, "due_date geçerli bir RFC3339 tarihi olmalı", http.StatusBadRequest)
+			return
+		}
+	}
+
+	todosMu.Lock()
+	defer todosMu.Unlock()
+
+	todos, err := readTodos()
+	if err != nil {
+		log.Println("Todo dosyası okunamadı:", err)
+		http.Error(w, "Todo güncellenemedi", http.StatusInternalServerError)
+		return
+	}
+
+	for i := range todos {
+		if todos[i].ID != id {
+			continue
+		}
+
+		if request.Title != nil {
+			todos[i].Title = *request.Title
+		}
+		if request.Description != nil {
+			todos[i].Description = *request.Description
+		}
+		if request.Done != nil {
+			todos[i].Done = *request.Done
+		}
+		if request.DueDate != nil {
+			todos[i].DueDate = *request.DueDate
+		}
+
+		todos[i].UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+
+		if err := writeTodos(todos); err != nil {
+			log.Println("Todo dosyasına yazılamadı:", err)
+			http.Error(w, "Todo kaydedilemedi", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(todos[i])
+		return
+	}
+
+	http.Error(w, "Todo bulunamadı", http.StatusNotFound)
+}
+func deleteTodoHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	todosMu.Lock()
+	defer todosMu.Unlock()
+
+	todos, err := readTodos()
+	if err != nil {
+		log.Println("Todo dosyası okunamadı:", err)
+		http.Error(w, "Todo silinemedi", http.StatusInternalServerError)
+		return
+	}
+
+	for i := range todos {
+		if todos[i].ID != id {
+			continue
+		}
+
+		todos = append(todos[:i], todos[i+1:]...)
+
+		if err := writeTodos(todos); err != nil {
+			log.Println("Todo dosyasına yazılamadı:", err)
+			http.Error(w, "Todo silinemedi", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+		return
 	}
 
 	http.Error(w, "Todo bulunamadı", http.StatusNotFound)

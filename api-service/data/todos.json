@@ -3,23 +3,14 @@
     "id": "e0e5e6f8a129e407ecfb3354911f2a9e",
     "title": "Go öğren",
     "description": "İlk todo kaydım",
-    "done": false,
+    "done": true,
     "due_date": "",
     "created_at": "2026-10-13T19:53:26Z",
-    "updated_at": "2026-10-13T19:53:26Z"
+    "updated_at": "2026-10-13T20:23:55Z"
   },
   {
     "id": "05c48dfaf7c1303e5f52dd14beeab87b",
     "title": "İkinci görev",
-    "description": "",
-    "done": false,
-    "due_date": "",
-    "created_at": "2026-10-13T20:03:20Z",
-    "updated_at": "2026-10-13T20:03:20Z"
-  },
-  {
-    "id": "020e3e3277f223037343270c72ffc1f5",
-    "title": "Üçüncü görev",
     "description": "",
     "done": false,
     "due_date": "",

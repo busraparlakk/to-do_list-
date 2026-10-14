@@ -78,7 +78,7 @@ Ne yapacaksın: api-service/ içinde, seçtiğin dilin en minimal HTTP sunucusun
 Neden CRUD'a değil de sağlık kontrolüne önce başlıyoruz? Çünkü şu an test etmek istediğin şey iş mantığı değil, "sunucu gerçekten ayakta mı, doğru portu dinliyor mu" sorusu. En küçük, en az mantık içeren parçadan başlayıp onu doğrulamak, ileride bir hata çıktığında "sorun temel kurulumda mı yoksa iş mantığında mı" ayrımını kolaylaştırır.
 
 Doğrulama: curl http://localhost:4000/health çalıştır, 200 ve beklediğin JSON'u görmelisin.
-##
+
 Adım 1.2 — todos.json dosyasını ve okuma/yazma yardımcı fonksiyonlarını oluştur
 Ne yapacaksın:
 
@@ -116,7 +116,7 @@ Doğrulama: Bir kaydı done: true yap, sonra GET ile tekrar çek, değişikliği
 
 Adım 1.6 — DELETE /api/todos/{id} endpoint'ini yaz
 Doğrulama: Bir kaydı sil, GET /api/todos ile listede olmadığını, GET /api/todos/{id} ile 404 döndüğünü doğrula.
-
+##
 Adım 1.7 — CORS ayarını ekle
 Neden CRUD bittikten sonra, en sona bırakıyoruz? Çünkü CORS, tarayıcının başka bir origin'den (Faz 2'de kuracağın Web UI, :3000'den :4000'e) gelen isteklere izin verip vermemesiyle ilgili bir tarayıcı güvenlik mekanizması. curl ile test ederken CORS hatası görmezsin (CORS sadece tarayıcıda uygulanır), bu yüzden bu noktaya kadar hiç sorun yaşamamış olabilirsin. Faz 2'de tarayıcıdan fetch çağırdığında aniden "CORS hatası" görürsen şaşırmaman için, bunu şimdiden bilerek ekliyoruz.
 

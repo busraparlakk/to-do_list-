@@ -5,3 +5,9 @@ type CreateTodoRequest struct { // todo varken başka bir yapı oluşturduk çü
 	Description string `json:"description"` // CreateTodoRequest ise kullanıcının oluşturma isteğinde göndereceği alanları temsiö eder.
 	DueDate     string `json:"due_date"`
 }
+type UpdateTodoRequest struct {
+	Title       *string `json:"title"`
+	Description *string `json:"description"`
+	Done        *bool   `json:"done"`
+	DueDate     *string `json:"due_date"`
+}
