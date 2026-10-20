@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo Uygulaması</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/style.css">
+    <script src="/app.js" defer></script>
+</head>
+<body>
+    <main class="container">
+        <h1>Yapılacaklar</h1>
+        <p class="subtitle">Görevlerini tek bir yerden takip et.</p>
+
+        <form id="todo-form" class="todo-form">
+            <label for="title">Yeni görev</label>
+
+            <div class="form-row">
+                 <input
+                     id="title"
+                    name="title"
+                    type="text"
+                    placeholder="Görev başlığını yaz"
+                    required
+                 >
+                 <button id="add-button" type="submit" class="add-button">
+                       Ekle
+                </button>
+            </div>
+
+            <p id="form-status" role="status"></p>
+        </form>
+
+        <p id="list-status" role="status"></p>
+        <ul id="todo-list" class="todo-list"></ul>
+    </main>
+</body>
+</html>

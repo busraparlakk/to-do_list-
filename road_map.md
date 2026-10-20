@@ -116,7 +116,6 @@ Doğrulama: Bir kaydı done: true yap, sonra GET ile tekrar çek, değişikliği
 
 Adım 1.6 — DELETE /api/todos/{id} endpoint'ini yaz
 Doğrulama: Bir kaydı sil, GET /api/todos ile listede olmadığını, GET /api/todos/{id} ile 404 döndüğünü doğrula.
-##
 Adım 1.7 — CORS ayarını ekle
 Neden CRUD bittikten sonra, en sona bırakıyoruz? Çünkü CORS, tarayıcının başka bir origin'den (Faz 2'de kuracağın Web UI, :3000'den :4000'e) gelen isteklere izin verip vermemesiyle ilgili bir tarayıcı güvenlik mekanizması. curl ile test ederken CORS hatası görmezsin (CORS sadece tarayıcıda uygulanır), bu yüzden bu noktaya kadar hiç sorun yaşamamış olabilirsin. Faz 2'de tarayıcıdan fetch çağırdığında aniden "CORS hatası" görürsen şaşırmaman için, bunu şimdiden bilerek ekliyoruz.
 
@@ -162,11 +161,13 @@ Faz 2 Bitiş Kriteri
  Web UI, :4000'deki API'ye tam adresle bağlanıyor ve tüm CRUD işlemleri tarayıcıdan çalışıyor
  Sayfa yenilendiğinde veri kaybolmuyor (çünkü API'den her seferinde taze çekiliyor)
  Konsolda hata yok
+
 FAZ 3 — Go Reverse Proxy / API Gateway (asıl hedef)
 Buraya kadarki her şey, bu fazı anlamlı kılmak için yapıldı: elinde, birbirinden bağımsız, doğruluğu kanıtlanmış iki servis var. Şimdi onları tek kapıdan geçirecek üçüncü, bağımsız bir Go uygulaması yazacaksın.
 
 Neden proxy'yi en son yazıyoruz?
 Çünkü proxy, kendi başına test edilemeyen bir bileşendir — arkasında gerçek, çalışan servisler olmadan proxy'nin doğru çalışıp çalışmadığını anlayamazsın. Bu yüzden onu, bağımlılıkları (Faz 1 ve Faz 2) hazır olduktan sonra yazmak, "hata proxy'de mi yoksa arkadaki serviste mi" belirsizliğini ortadan kaldırır.
+## burda kaldım
 
 Adım 3.1 — Go modülünü başlat, boş bir "hello world" HTTP sunucusu yaz
 Ne yapacaksın: gateway/ klasöründe go mod init çalıştır, :8080 portunu dinleyen ve her isteğe sabit bir metinle cevap veren minimal bir main.go yaz.
