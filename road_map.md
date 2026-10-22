@@ -63,7 +63,7 @@ Neden bu dosya önce yazılır, koddan önce? Çünkü Faz 1'de API'yi yazarken 
 
 Doğrulama: Dokümanı bir arkadaşına (ya da kendine, bir gün sonra) verdiğinde, kod görmeden sadece bu dosyaya bakarak API'yi nasıl kullanacağını anlatabilmen gerekir.
 
-burdayım Adım 0.3 — Port ve isimlendirme kararlarını docs/README.md'ye yaz
+Adım 0.3 — Port ve isimlendirme kararlarını docs/README.md'ye yaz
 API servisi → port 4000
 Web UI servisi → port 3000
 Gateway (dışarıya açılan tek kapı) → port 8080
@@ -167,7 +167,7 @@ Buraya kadarki her şey, bu fazı anlamlı kılmak için yapıldı: elinde, birb
 
 Neden proxy'yi en son yazıyoruz?
 Çünkü proxy, kendi başına test edilemeyen bir bileşendir — arkasında gerçek, çalışan servisler olmadan proxy'nin doğru çalışıp çalışmadığını anlayamazsın. Bu yüzden onu, bağımlılıkları (Faz 1 ve Faz 2) hazır olduktan sonra yazmak, "hata proxy'de mi yoksa arkadaki serviste mi" belirsizliğini ortadan kaldırır.
-## burda kaldım
+
 
 Adım 3.1 — Go modülünü başlat, boş bir "hello world" HTTP sunucusu yaz
 Ne yapacaksın: gateway/ klasöründe go mod init çalıştır, :8080 portunu dinleyen ve her isteğe sabit bir metinle cevap veren minimal bir main.go yaz.
@@ -211,6 +211,9 @@ Faz 3 Bitiş Kriteri
  /api/ ile başlayan her şey doğru şekilde API'ye gidiyor
  Diğer her şey doğru şekilde Web UI'ye gidiyor
  Bir backend kapandığında proxy'nin verdiği hatayı gözlemledim ve anladım
+
+ Faz 3’te Go reverse proxy ile API ve Web UI servislerini 8080 portunda birleştirdik. Arayüz isteklerini göreli adreslere çevirdik ve CRUD işlemlerini gateway üzerinden doğruladık. API kapalıyken 502 hatasını gözlemledik; servis yeniden açıldığında isteklerin normale döndüğünü test ettik.
+
 FAZ 4 — Doğrulama ve Belgeleme
 Adım 4.1 — docs/README.md'yi güncelle
 Şunları ekle: üç servisi hangi sırayla başlatman gerektiği (API → Web UI → Gateway — neden bu sıra? Çünkü proxy, arkasında zaten çalışan servisler bekliyor; onları önce ayağa kaldırmazsan proxy'nin verdiği hatalar yanıltıcı olur), her biri için çalıştırma komutu, örnek curl komutları.
@@ -219,6 +222,13 @@ Adım 4.2 — Sıfırdan tam senaryo testi
 Bilgisayarını yeniden başlatmış gibi düşün: üç servisi sırasıyla başlat, tarayıcıda sadece :8080'i kullanarak bir kullanıcı gibi uçtan uca test et (ekle, tamamla, düzenle, sil).
 
 Neden bunu ayrı bir adım olarak yapıyoruz? Geliştirme sırasında muhtemelen servisleri hiç kapatmadan, sürekli açık tutarak ilerledin. "Sıfırdan başlatma" senaryosu, gizli kalmış bağımlılıkları (örneğin "aslında A servisi açık değilken B servisi hata veriyor ama fark etmemiştim" gibi) ortaya çıkarır.
+
+Faz 4 Bitiş Kriteri
+ docs/README.md çalıştırma sırası, portlar ve örnek isteklerle eksiksiz güncellendi
+ Servisler sıfırdan ayağa kaldırılarak uçtan uca tüm CRUD işlemleri ve API testleri başarıyla tamamlandı
+ Backend servis kapalıyken 502 Bad Gateway hata davranışı ve servis açıldığında otomatik toparlanma test edildi
+
+ Faz 4 tamamlandı: Projedeki tüm geliştirme fazları (Faz 0, 1, 2, 3 ve 4) ve uçtan uca senaryo testleri başarıyla tamamlandı. Sistem Gateway (:8080) üzerinden tam entegre olarak çalışmaktadır.
 
 FAZ 5 — Sonraki Adımlar (şimdilik uygulama, sadece not al)
 Faz 3 Adım 3.5'te gözlemlediğin hata senaryosu, bu listedeki ilk maddenin neden var olduğunu zaten sana gösterdi. Listenin geri kalanı da benzer şekilde, bugün karşılaştığın küçük sürtünmelerin büyütülmüş, üretim seviyesindeki karşılıkları:

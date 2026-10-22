@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:4000";
+const API_BASE_URL = "";
 
 const todoList = document.getElementById("todo-list");
 const listStatus = document.getElementById("list-status");
