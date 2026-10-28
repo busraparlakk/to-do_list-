@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 )
@@ -21,21 +20,6 @@ func createTodoHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Geçersiz JSON", http.StatusBadRequest)
 		return
-	}
-
-	request.Title = strings.TrimSpace(request.Title)
-
-	if request.Title == "" {
-		http.Error(w, "title boş olamaz", http.StatusBadRequest)
-		return
-	}
-
-	if request.DueDate != "" {
-		_, err := time.Parse(time.RFC3339, request.DueDate)
-		if err != nil {
-			http.Error(w, "due_date geçerli bir RFC3339 tarihi olmalı", http.StatusBadRequest)
-			return
-		}
 	}
 
 	idBytes := make([]byte, 16)
@@ -58,6 +42,13 @@ func createTodoHandler(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:   now,
 	}
 
+	todo.Normalize()
+
+	if err := todo.Validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	todosMu.Lock()
 	defer todosMu.Unlock()
 
@@ -70,8 +61,7 @@ func createTodoHandler(w http.ResponseWriter, r *http.Request) {
 
 	todos = append(todos, todo)
 
-	err = writeTodos(todos)
-	if err != nil {
+	if err := writeTodos(todos); err != nil {
 		log.Println("Todo dosyasına yazılamadı:", err)
 		http.Error(w, "Todo kaydedilemedi", http.StatusInternalServerError)
 		return
@@ -81,6 +71,7 @@ func createTodoHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(todo)
 }
+
 func listTodosHandler(w http.ResponseWriter, r *http.Request) {
 	todosMu.Lock()
 	todos, err := readTodos()
@@ -92,14 +83,20 @@ func listTodosHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if todos == nil {
-		todos = []Todo{}
+	// Yalnızca silinmemiş kayıtları yanıta ekle.
+	activeTodos := make([]Todo, 0)
+
+	for _, todo := range todos {
+		if !todo.IsDeleted() {
+			activeTodos = append(activeTodos, todo)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(todos)
+	json.NewEncoder(w).Encode(activeTodos)
 }
+
 func getTodoHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
@@ -114,7 +111,7 @@ func getTodoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, todo := range todos {
-		if todo.ID == id {
+		if todo.ID == id && !todo.IsDeleted() {
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(todo)
@@ -124,6 +121,7 @@ func getTodoHandler(w http.ResponseWriter, r *http.Request) {
 
 	http.Error(w, "Todo bulunamadı", http.StatusNotFound)
 }
+
 func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
@@ -144,24 +142,12 @@ func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 
 	if request.Title == nil && request.Description == nil &&
 		request.Done == nil && request.DueDate == nil {
-		http.Error(w, "En az bir güncellenecek alan gönderilmeli", http.StatusBadRequest)
+		http.Error(
+			w,
+			"En az bir güncellenecek alan gönderilmeli",
+			http.StatusBadRequest,
+		)
 		return
-	}
-
-	if request.Title != nil {
-		title := strings.TrimSpace(*request.Title)
-		if title == "" {
-			http.Error(w, "title boş olamaz", http.StatusBadRequest)
-			return
-		}
-		request.Title = &title
-	}
-
-	if request.DueDate != nil && *request.DueDate != "" {
-		if _, err := time.Parse(time.RFC3339, *request.DueDate); err != nil {
-			http.Error(w, "due_date geçerli bir RFC3339 tarihi olmalı", http.StatusBadRequest)
-			return
-		}
 	}
 
 	todosMu.Lock()
@@ -175,24 +161,38 @@ func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i := range todos {
-		if todos[i].ID != id {
+		// Silinmiş kayıtlar güncellenemez.
+		if todos[i].ID != id || todos[i].IsDeleted() {
 			continue
 		}
 
+		updatedTodo := todos[i]
+
 		if request.Title != nil {
-			todos[i].Title = *request.Title
-		}
-		if request.Description != nil {
-			todos[i].Description = *request.Description
-		}
-		if request.Done != nil {
-			todos[i].Done = *request.Done
-		}
-		if request.DueDate != nil {
-			todos[i].DueDate = *request.DueDate
+			updatedTodo.Title = *request.Title
 		}
 
-		todos[i].UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+		if request.Description != nil {
+			updatedTodo.Description = *request.Description
+		}
+
+		if request.Done != nil {
+			updatedTodo.Done = *request.Done
+		}
+
+		if request.DueDate != nil {
+			updatedTodo.DueDate = *request.DueDate
+		}
+
+		updatedTodo.Normalize()
+
+		if err := updatedTodo.Validate(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		updatedTodo.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+		todos[i] = updatedTodo
 
 		if err := writeTodos(todos); err != nil {
 			log.Println("Todo dosyasına yazılamadı:", err)
@@ -202,12 +202,13 @@ func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(todos[i])
+		json.NewEncoder(w).Encode(updatedTodo)
 		return
 	}
 
 	http.Error(w, "Todo bulunamadı", http.StatusNotFound)
 }
+
 func deleteTodoHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
@@ -222,11 +223,12 @@ func deleteTodoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i := range todos {
-		if todos[i].ID != id {
+		if todos[i].ID != id || todos[i].IsDeleted() {
 			continue
 		}
 
-		todos = append(todos[:i], todos[i+1:]...)
+		// Kaydı diziden çıkarmak yerine silinmiş olarak işaretle.
+		todos[i].MarkDeleted()
 
 		if err := writeTodos(todos); err != nil {
 			log.Println("Todo dosyasına yazılamadı:", err)

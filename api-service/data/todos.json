@@ -6,6 +6,27 @@
     "done": true,
     "due_date": "",
     "created_at": "2026-10-16T10:41:43Z",
-    "updated_at": "2026-10-16T10:41:45Z"
+    "updated_at": "2026-10-16T10:41:45Z",
+    "deleted_at": null
+  },
+  {
+    "id": "8e3692a8961cdca894aa3137b731d10b",
+    "title": "Doğrulama testi",
+    "description": "",
+    "done": false,
+    "due_date": "",
+    "created_at": "2026-10-28T16:10:13Z",
+    "updated_at": "2026-10-28T16:10:13Z",
+    "deleted_at": null
+  },
+  {
+    "id": "1bab1f0255ffb047748ea6fe3e43da1c",
+    "title": "Soft delete testi",
+    "description": "",
+    "done": false,
+    "due_date": "",
+    "created_at": "2026-10-28T16:22:14Z",
+    "updated_at": "2026-10-28T16:22:26Z",
+    "deleted_at": "2026-10-28T16:22:26.7946881Z"
   }
 ]
