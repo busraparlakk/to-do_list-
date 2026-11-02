@@ -6,9 +6,11 @@
 - Gateway: http://localhost:8080
 
 Aşağıdaki endpoint'lere her iki adres üzerinden erişilebilir.
-Web UI, gateway üzerinden `/api/todos` yolunu kullanır.
+Web UI, gateway üzerinden `/api/*` yollarını kullanır.
 
-## Veri modeli
+## Veri Modelleri
+
+### 1. Todo Modeli
 
 | Alan | Tip | Açıklama |
 | --- | --- | --- |
@@ -17,263 +19,204 @@ Web UI, gateway üzerinden `/api/todos` yolunu kullanır.
 | description | string | Opsiyonel; varsayılan boş metin |
 | done | boolean | Varsayılan false |
 | due_date | string | Opsiyonel; boş metin veya RFC3339 biçiminde tarih ve saat |
+| visibility | string | `private` (varsayılan) veya `public` |
+| user_id | string | Todo'yu oluşturan kullanıcının kimliği |
+| username | string | Todo'yu oluşturan kullanıcının kullanıcı adı |
 | created_at | string | Sunucunun belirlediği UTC oluşturulma zamanı |
 | updated_at | string | Sunucunun belirlediği UTC son değişiklik zamanı |
 | deleted_at | string veya null | UTC silinme zamanı; aktif kayıtta null |
 
-Tarih örneği: `2026-10-28T18:00:00Z`.
+### 2. User Modeli
 
-Eski dosya kayıtlarında `deleted_at` alanı bulunmuyorsa kayıt aktif
-kabul edilir.
+| Alan | Tip | Açıklama |
+| --- | --- | --- |
+| id | string | Benzersiz kullanıcı kimliği |
+| username | string | Benzersiz kullanıcı adı (en az 3 karakter) |
+| role | string | `user` (standart kullanıcı) veya `superadmin` (süper admin) |
+| created_at | string | UTC oluşturulma zamanı |
 
-## İstek modelleri ve doğrulama
+Varsayılan Sistem Hesapları:
+- **admin** (Şifre: `admin123`, Rol: `superadmin`)
+- **user1** (Şifre: `user123`, Rol: `user`)
 
-İstemciden gelen veriler DTO yapılarıyla alınır:
+## Kimlik Doğrulama ve Yetkilendirme Kuralları
 
-- CreateTodoRequest: title, description, due_date
-- UpdateTodoRequest: title, description, done, due_date
+API isteklerinde `Authorization: Bearer <token>` başlığı kullanılır.
 
-id, created_at, updated_at ve deleted_at alanlarını sunucu yönetir.
-Bu alanlar istek DTO'larının parçası değildir.
+### Görünürlük ve Erişim Kuralları:
+1. **Private (`private`):** Yalnızca oluşturan kullanıcı ve **Süper Admin** tarafından görülebilir.
+2. **Public (`public`):** Oturum açmış tüm kullanıcılar ve **Süper Admin** tarafından görülebilir.
+3. **Güncelleme ve Silme:** Sadece todo'nun sahibi veya **Süper Admin** güncelleyebilir ve silebilir. Başka bir kullanıcının todo'sunu güncellemeye veya silmeye çalışıldığında `403 Forbidden` döner.
+4. **Süper Admin (`superadmin`):** Tüm kullanıcıların hem gizli hem açık tüm todo'larını görüntüleyebilir, güncelleyebilir ve silebilir.
 
-Oluşturma ve güncellemede ortak kurallar uygulanır:
+---
 
-- Başlığın başındaki ve sonundaki boşluklar temizlenir.
-- Temizlendikten sonra boş kalan başlık reddedilir.
-- due_date boş olabilir; doluysa geçerli bir RFC3339 tarihi olmalıdır.
-- Geçersiz alan değerleri için 400 Bad Request döner.
-- Doğrulama başarısız olursa değişiklik dosyaya yazılmaz.
+## Kimlik Doğrulama Endpoint'leri
 
-JSON yanıtlarının Content-Type değeri:
-`application/json; charset=utf-8`.
+### POST /api/auth/register
 
-Hata yanıtları JSON değil, düz metindir.
-Örnek hata mesajları:
+Yeni bir kullanıcı hesabı oluşturur ve oturum token'ı döner.
 
-```text
-title boş olamaz
+Request Body:
+```json
+{
+  "username": "ahmet",
+  "password": "guclu_sifre_123"
+}
 ```
 
-```text
-due_date geçerli bir RFC3339 tarihi olmalı
+Response Body (201 Created):
+```json
+{
+  "token": "a1b2c3d4...",
+  "user": {
+    "id": "u-123",
+    "username": "ahmet",
+    "role": "user",
+    "created_at": "2026-11-02T12:00:00Z"
+  }
+}
 ```
 
-## GET /api/todos
+### POST /api/auth/login
 
-Yalnızca aktif kayıtları listeler. Silinmiş kayıtlar döndürülmez.
+Kullanıcı adı ve şifre ile giriş yapar.
 
-Request Body: Yok.
+Request Body:
+```json
+{
+  "username": "admin",
+  "password": "admin123"
+}
+```
 
-Response Body:
+Response Body (200 OK):
+```json
+{
+  "token": "e5f6g7h8...",
+  "user": {
+    "id": "u-admin",
+    "username": "admin",
+    "role": "superadmin",
+    "created_at": "2026-11-02T12:00:00Z"
+  }
+}
+```
 
+### GET /api/auth/me
+
+Mevcut oturum açmış kullanıcının bilgilerini döner.
+
+Headers:
+`Authorization: Bearer <token>`
+
+Response Body (200 OK):
+```json
+{
+  "id": "u-admin",
+  "username": "admin",
+  "role": "superadmin",
+  "created_at": "2026-11-02T12:00:00Z"
+}
+```
+
+---
+
+## Todo Endpoint'leri
+
+### GET /api/todos
+
+Kullanıcının görmeye yetkili olduğu aktif kayıtları listeler.
+- Normal kullanıcı: Kendi todo'ları + diğer kullanıcıların `public` todo'ları.
+- Süper Admin: Tüm kullanıcıların tüm todo'ları.
+
+Headers:
+`Authorization: Bearer <token>`
+
+Response Body (200 OK):
 ```json
 [
   {
     "id": "todo-123",
-    "title": "Reverse proxy öğren",
-    "description": "Go ile reverse proxy geliştir",
+    "title": "Rapor hazırla",
+    "description": "",
     "done": false,
-    "due_date": "2026-09-30T18:00:00Z",
-    "created_at": "2026-09-25T15:00:00Z",
-    "updated_at": "2026-09-25T15:00:00Z",
+    "due_date": "",
+    "visibility": "private",
+    "user_id": "u-123",
+    "username": "user1",
+    "created_at": "2026-11-02T12:00:00Z",
+    "updated_at": "2026-11-02T12:00:00Z",
     "deleted_at": null
   }
 ]
 ```
 
-Aktif kayıt yoksa `200 OK` ile boş JSON dizisi `[]` döner.
-
-Status Codes:
-
-- 200 OK
-- 500 Internal Server Error
-
-## GET /api/todos/{id}
-
-Belirtilen kimliğe sahip aktif kaydı getirir.
-
-Request Body: Yok.
-
-Response Body:
-
-```json
-{
-  "id": "todo-123",
-  "title": "Reverse proxy öğren",
-  "description": "Go ile reverse proxy geliştir",
-  "done": false,
-  "due_date": "2026-09-30T18:00:00Z",
-  "created_at": "2026-09-25T15:00:00Z",
-  "updated_at": "2026-09-25T15:00:00Z",
-  "deleted_at": null
-}
-```
-
-Kayıt yoksa veya silinmişse `404 Not Found` döner:
-
-```text
-Todo bulunamadı
-```
-
-Status Codes:
-
-- 200 OK
-- 404 Not Found
-- 500 Internal Server Error
-
-## POST /api/todos
+### POST /api/todos
 
 Yeni bir todo oluşturur.
 
-Request Body:
+Headers:
+`Authorization: Bearer <token>`
 
+Request Body:
 ```json
 {
-  "title": "Reverse proxy öğren",
-  "description": "Go ile reverse proxy geliştir",
-  "due_date": "2026-09-30T18:00:00Z"
+  "title": "Ekip toplantısı",
+  "description": "Haftalık planlama",
+  "visibility": "public"
 }
 ```
+- `visibility`: `"public"` veya `"private"` (belirtilmezse varsayılan `"private"`).
 
-- title zorunludur.
-- description ve due_date gönderilmezse boş metin olur.
-- done sunucu tarafından false olarak belirlenir.
-- deleted_at başlangıçta null olur.
-- created_at ve updated_at başlangıçta aynı zamandır.
-- Mevcut oluşturma işleminde DTO'da bulunmayan JSON alanları yok sayılır.
-
-Response Body:
-
+Response Body (201 Created):
 ```json
 {
-  "id": "todo-123",
-  "title": "Reverse proxy öğren",
-  "description": "Go ile reverse proxy geliştir",
+  "id": "todo-456",
+  "title": "Ekip toplantısı",
+  "description": "Haftalık planlama",
   "done": false,
-  "due_date": "2026-09-30T18:00:00Z",
-  "created_at": "2026-09-25T15:00:00Z",
-  "updated_at": "2026-09-25T15:00:00Z",
+  "due_date": "",
+  "visibility": "public",
+  "user_id": "u-123",
+  "username": "user1",
+  "created_at": "2026-11-02T12:10:00Z",
+  "updated_at": "2026-11-02T12:10:00Z",
   "deleted_at": null
 }
 ```
 
-Status Codes:
+### PUT /api/todos/{id}
 
-- 201 Created
-- 400 Bad Request
-- 500 Internal Server Error
+Var olan todo'yu günceller. Sadece sahibi veya Süper Admin güncelleyebilir.
 
-## PUT /api/todos/{id}
-
-Mevcut uygulamada kısmi güncelleme yapar:
-yalnızca gönderilen alanlar değiştirilir, gönderilmeyen alanlar korunur.
+Headers:
+`Authorization: Bearer <token>`
 
 Request Body:
-
 ```json
 {
-  "title": "Reverse proxy çalış",
-  "description": "Go ile reverse proxy geliştir",
   "done": true,
-  "due_date": "2026-09-30T18:00:00Z"
+  "visibility": "private"
 }
-```
-
-Yalnızca tamamlanma durumunu değiştirmek de mümkündür:
-
-```json
-{
-  "done": true
-}
-```
-
-Güncelleme kuralları:
-
-- En az bir güncellenecek alan gönderilmelidir.
-- Body tek bir JSON nesnesi içermelidir.
-- DTO'da bulunmayan alanlar 400 Bad Request ile reddedilir.
-- title gönderilmişse boş olamaz.
-- description veya due_date, boş metin gönderilerek temizlenebilir.
-- Mevcut DTO yapısında null değerler gönderilmemiş alan gibi değerlendirilir.
-- done: false gönderilmesi geçerli bir güncellemedir.
-- Başarılı güncellemede updated_at yenilenir.
-- id ve created_at korunur.
-- Geçersiz güncellemede kayıt ve updated_at değiştirilmez.
-- Silinmiş kayıt güncellenemez.
-
-Response Body:
-
-```json
-{
-  "id": "todo-123",
-  "title": "Reverse proxy çalış",
-  "description": "Go ile reverse proxy geliştir",
-  "done": true,
-  "due_date": "2026-09-30T18:00:00Z",
-  "created_at": "2026-09-25T15:00:00Z",
-  "updated_at": "2026-09-25T16:00:00Z",
-  "deleted_at": null
-}
-```
-
-Geçerli bir body ile silinmiş veya olmayan kayda yapılan istek
-`404 Not Found` döner:
-
-```text
-Todo bulunamadı
 ```
 
 Status Codes:
+- `200 OK`: Başarılı güncelleme.
+- `400 Bad Request`: Geçersiz JSON veya alan.
+- `401 Unauthorized`: Giriş yapılmamış.
+- `403 Forbidden`: Todo başkasına ait ve kullanıcı süper admin değil.
+- `404 Not Found`: Todo bulunamadı veya silinmiş.
 
-- 200 OK
-- 400 Bad Request
-- 404 Not Found
-- 500 Internal Server Error
+### DELETE /api/todos/{id}
 
-## DELETE /api/todos/{id}
+Todo'yu soft delete ile siler. Sadece sahibi veya Süper Admin silebilir.
 
-Aktif kaydı soft delete yöntemiyle silinmiş olarak işaretler.
-
-Request Body: Yok.
-
-Başarılı Response Body: Yok.
-
-İşlem sırasında:
-
-- Kayıt todos.json dosyasından kaldırılmaz.
-- deleted_at alanına UTC silinme zamanı yazılır.
-- updated_at yenilenir.
-- Kaydın diğer alanları korunur.
-- Başarılı işlem 204 No Content döner.
-
-Silinen kayıt artık:
-
-- GET /api/todos listesinde görünmez.
-- GET /api/todos/{id} ile alınamaz.
-- PUT /api/todos/{id} ile güncellenemez.
-
-Aynı kayda tekrar DELETE gönderilirse 404 Not Found döner.
-İlk silinme zamanı ve updated_at değiştirilmez.
-
-Silinmiş veya olmayan kayıt için hata gövdesi:
-
-```text
-Todo bulunamadı
-```
+Headers:
+`Authorization: Bearer <token>`
 
 Status Codes:
-
-- 204 No Content
-- 404 Not Found
-- 500 Internal Server Error
-
-## Saklama ve geri yükleme kapsamı
-
-Mevcut uygulamada silinmiş kayıtlar dosyada saklanır.
-
-- Geri yükleme endpoint'i yoktur.
-- Otomatik kalıcı silme işlemi yoktur.
-- Saklama süresi belirlenmemiştir.
-
-Saklama süresi, geri yükleme ve kalıcı silme kuralları ileride
-ayrıca tasarlanacaktır.
+- `204 No Content`: Başarılı silme.
+- `401 Unauthorized`: Giriş yapılmamış.
+- `403 Forbidden`: Todo başkasına ait ve kullanıcı süper admin değil.
+- `404 Not Found`: Todo bulunamadı veya silinmiş.

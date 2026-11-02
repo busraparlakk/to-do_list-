@@ -10,30 +10,83 @@
 </head>
 <body>
     <main class="container">
-        <h1>Yapılacaklar</h1>
-        <p class="subtitle">Görevlerini tek bir yerden takip et.</p>
+        <header class="app-header">
+            <div>
+                <h1>Yapılacaklar</h1>
+                <p class="subtitle">Görevlerini ve gizlilik ayarlarını tek bir yerden yönet.</p>
+            </div>
+            <div id="user-profile" class="user-profile hidden">
+                <div class="user-info">
+                    <span id="current-username" class="username"></span>
+                    <span id="current-role-badge" class="badge"></span>
+                </div>
+                <button id="logout-button" type="button" class="logout-button">Çıkış Yap</button>
+            </div>
+        </header>
 
-        <form id="todo-form" class="todo-form">
-            <label for="title">Yeni görev</label>
-
-            <div class="form-row">
-                 <input
-                     id="title"
-                    name="title"
-                    type="text"
-                    placeholder="Görev başlığını yaz"
-                    required
-                 >
-                 <button id="add-button" type="submit" class="add-button">
-                       Ekle
-                </button>
+        <!-- Giriş ve Kayıt Bölümü -->
+        <section id="auth-section" class="auth-section">
+            <div class="auth-tabs">
+                <button type="button" id="tab-login" class="tab-button active">Giriş Yap</button>
+                <button type="button" id="tab-register" class="tab-button">Kayıt Ol</button>
             </div>
 
-            <p id="form-status" role="status"></p>
-        </form>
+            <form id="auth-form" class="auth-form">
+                <div class="form-group">
+                    <label for="auth-username">Kullanıcı Adı</label>
+                    <input id="auth-username" type="text" placeholder="Kullanıcı adınızı girin" required autocomplete="username">
+                </div>
 
-        <p id="list-status" role="status"></p>
-        <ul id="todo-list" class="todo-list"></ul>
+                <div class="form-group">
+                    <label for="auth-password">Şifre</label>
+                    <input id="auth-password" type="password" placeholder="Şifrenizi girin" required autocomplete="current-password">
+                </div>
+
+                <button id="auth-submit-btn" type="submit" class="auth-submit-btn">Giriş Yap</button>
+                <p id="auth-status" class="status-msg" role="status"></p>
+
+                <div class="auth-demo-hint">
+                    <small>Varsayılan Hesaplar: <strong>admin</strong> (şifre: <code>admin123</code> - Süper Admin) | <strong>user1</strong> (şifre: <code>user123</code> - Kullanıcı)</small>
+                </div>
+            </form>
+        </section>
+
+        <!-- Todo Yönetim Bölümü (Sadece oturum açılınca görünür) -->
+        <section id="app-content" class="app-content hidden">
+            <form id="todo-form" class="todo-form">
+                <label for="title">Yeni görev</label>
+
+                <div class="form-row">
+                    <input
+                        id="title"
+                        name="title"
+                        type="text"
+                        placeholder="Görev başlığını yaz"
+                        required
+                    >
+                    <select id="visibility" class="visibility-select" title="Görünürlük Ayarı">
+                        <option value="private" selected>🔒 Özel (Sadece Ben)</option>
+                        <option value="public">🌐 Herkese Açık</option>
+                    </select>
+                    <button id="add-button" type="submit" class="add-button">
+                        Ekle
+                    </button>
+                </div>
+
+                <p id="form-status" class="status-msg" role="status"></p>
+            </form>
+
+            <div class="filter-bar">
+                <div class="filter-tabs">
+                    <button type="button" class="filter-btn active" data-filter="all">Tümü</button>
+                    <button type="button" class="filter-btn" data-filter="mine">Benim Todolarım</button>
+                    <button type="button" class="filter-btn" data-filter="public">Herkese Açık</button>
+                </div>
+            </div>
+
+            <p id="list-status" class="status-msg" role="status"></p>
+            <ul id="todo-list" class="todo-list"></ul>
+        </section>
     </main>
 </body>
 </html>

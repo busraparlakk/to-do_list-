@@ -1,0 +1,16 @@
+[
+  {
+    "id": "ceba3311d1903cfcda44b3665a45d25a",
+    "username": "admin",
+    "password_hash": "fbe19fc131a3b7c497b97b90607155ae46c21c75d34584f514c818ddb7e459f4",
+    "role": "superadmin",
+    "created_at": "2026-11-02T11:20:31Z"
+  },
+  {
+    "id": "ac00b655dd6eda2fa1b0745631ac7193",
+    "username": "user1",
+    "password_hash": "0b31153e61c23cac1de89f4910f0751416e4d2318523497a46787897ae40486c",
+    "role": "user",
+    "created_at": "2026-11-02T11:20:31Z"
+  }
+]

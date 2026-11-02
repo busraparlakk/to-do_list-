@@ -14,36 +14,40 @@ import (
 var todosMu sync.Mutex
 
 func createTodoHandler(w http.ResponseWriter, r *http.Request) {
-	var request CreateTodoRequest
+	user, ok := getUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Yetkisiz erişim", http.StatusUnauthorized)
+		return
+	}
 
-	err := json.NewDecoder(r.Body).Decode(&request)
-	if err != nil {
+	var request CreateTodoRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Geçersiz JSON", http.StatusBadRequest)
 		return
 	}
 
 	idBytes := make([]byte, 16)
-	_, err = rand.Read(idBytes)
-	if err != nil {
+	if _, err := rand.Read(idBytes); err != nil {
 		log.Println("ID üretilemedi:", err)
 		http.Error(w, "Todo oluşturulamadı", http.StatusInternalServerError)
 		return
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-
 	todo := Todo{
 		ID:          hex.EncodeToString(idBytes),
 		Title:       request.Title,
 		Description: request.Description,
 		Done:        false,
 		DueDate:     request.DueDate,
+		Visibility:  request.Visibility,
+		UserID:      user.ID,
+		Username:    user.Username,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
 
 	todo.Normalize()
-
 	if err := todo.Validate(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -60,7 +64,6 @@ func createTodoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	todos = append(todos, todo)
-
 	if err := writeTodos(todos); err != nil {
 		log.Println("Todo dosyasına yazılamadı:", err)
 		http.Error(w, "Todo kaydedilemedi", http.StatusInternalServerError)
@@ -69,10 +72,16 @@ func createTodoHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(todo)
+	_ = json.NewEncoder(w).Encode(todo)
 }
 
 func listTodosHandler(w http.ResponseWriter, r *http.Request) {
+	user, ok := getUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Yetkisiz erişim", http.StatusUnauthorized)
+		return
+	}
+
 	todosMu.Lock()
 	todos, err := readTodos()
 	todosMu.Unlock()
@@ -83,21 +92,25 @@ func listTodosHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Yalnızca silinmemiş kayıtları yanıta ekle.
 	activeTodos := make([]Todo, 0)
-
 	for _, todo := range todos {
-		if !todo.IsDeleted() {
+		if !todo.IsDeleted() && todo.CanView(user) {
 			activeTodos = append(activeTodos, todo)
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(activeTodos)
+	_ = json.NewEncoder(w).Encode(activeTodos)
 }
 
 func getTodoHandler(w http.ResponseWriter, r *http.Request) {
+	user, ok := getUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Yetkisiz erişim", http.StatusUnauthorized)
+		return
+	}
+
 	id := r.PathValue("id")
 
 	todosMu.Lock()
@@ -112,9 +125,14 @@ func getTodoHandler(w http.ResponseWriter, r *http.Request) {
 
 	for _, todo := range todos {
 		if todo.ID == id && !todo.IsDeleted() {
+			if !todo.CanView(user) {
+				http.Error(w, "Bu todoyu görüntüleme yetkiniz yok", http.StatusForbidden)
+				return
+			}
+
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(todo)
+			_ = json.NewEncoder(w).Encode(todo)
 			return
 		}
 	}
@@ -123,13 +141,17 @@ func getTodoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	user, ok := getUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Yetkisiz erişim", http.StatusUnauthorized)
+		return
+	}
 
+	id := r.PathValue("id")
 	var request UpdateTodoRequest
 
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
-
 	if err := decoder.Decode(&request); err != nil {
 		http.Error(w, "Geçersiz JSON veya alan", http.StatusBadRequest)
 		return
@@ -140,13 +162,8 @@ func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if request.Title == nil && request.Description == nil &&
-		request.Done == nil && request.DueDate == nil {
-		http.Error(
-			w,
-			"En az bir güncellenecek alan gönderilmeli",
-			http.StatusBadRequest,
-		)
+	if !hasUpdateFields(request) {
+		http.Error(w, "En az bir güncellenecek alan gönderilmeli", http.StatusBadRequest)
 		return
 	}
 
@@ -161,39 +178,24 @@ func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i := range todos {
-		// Silinmiş kayıtlar güncellenemez.
 		if todos[i].ID != id || todos[i].IsDeleted() {
 			continue
 		}
 
-		updatedTodo := todos[i]
-
-		if request.Title != nil {
-			updatedTodo.Title = *request.Title
+		if !todos[i].CanModify(user) {
+			http.Error(w, "Bu todoyu güncelleme yetkiniz yok", http.StatusForbidden)
+			return
 		}
 
-		if request.Description != nil {
-			updatedTodo.Description = *request.Description
-		}
+		applyTodoUpdates(&todos[i], request)
+		todos[i].Normalize()
 
-		if request.Done != nil {
-			updatedTodo.Done = *request.Done
-		}
-
-		if request.DueDate != nil {
-			updatedTodo.DueDate = *request.DueDate
-		}
-
-		updatedTodo.Normalize()
-
-		if err := updatedTodo.Validate(); err != nil {
+		if err := todos[i].Validate(); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		updatedTodo.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-		todos[i] = updatedTodo
-
+		todos[i].UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 		if err := writeTodos(todos); err != nil {
 			log.Println("Todo dosyasına yazılamadı:", err)
 			http.Error(w, "Todo kaydedilemedi", http.StatusInternalServerError)
@@ -202,7 +204,7 @@ func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(updatedTodo)
+		_ = json.NewEncoder(w).Encode(todos[i])
 		return
 	}
 
@@ -210,6 +212,12 @@ func updateTodoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func deleteTodoHandler(w http.ResponseWriter, r *http.Request) {
+	user, ok := getUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Yetkisiz erişim", http.StatusUnauthorized)
+		return
+	}
+
 	id := r.PathValue("id")
 
 	todosMu.Lock()
@@ -227,9 +235,12 @@ func deleteTodoHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Kaydı diziden çıkarmak yerine silinmiş olarak işaretle.
-		todos[i].MarkDeleted()
+		if !todos[i].CanModify(user) {
+			http.Error(w, "Bu todoyu silme yetkiniz yok", http.StatusForbidden)
+			return
+		}
 
+		todos[i].MarkDeleted()
 		if err := writeTodos(todos); err != nil {
 			log.Println("Todo dosyasına yazılamadı:", err)
 			http.Error(w, "Todo silinemedi", http.StatusInternalServerError)
@@ -241,4 +252,27 @@ func deleteTodoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Error(w, "Todo bulunamadı", http.StatusNotFound)
+}
+
+func hasUpdateFields(req UpdateTodoRequest) bool {
+	return req.Title != nil || req.Description != nil ||
+		req.Done != nil || req.DueDate != nil || req.Visibility != nil
+}
+
+func applyTodoUpdates(todo *Todo, req UpdateTodoRequest) {
+	if req.Title != nil {
+		todo.Title = *req.Title
+	}
+	if req.Description != nil {
+		todo.Description = *req.Description
+	}
+	if req.Done != nil {
+		todo.Done = *req.Done
+	}
+	if req.DueDate != nil {
+		todo.DueDate = *req.DueDate
+	}
+	if req.Visibility != nil {
+		todo.Visibility = *req.Visibility
+	}
 }
